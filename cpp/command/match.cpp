@@ -218,15 +218,15 @@ int MainCmds::match(int argc, const char* const* argv) {
       if(matchPairer->getMatchup(botSpecB, botSpecW, logger)) {
         string seed = gameSeedBase + ":" + Global::uint64ToHexString(thisLoopSeedRand.nextUInt64());
         gameData = gameRunner->runGame(
-          seed, botSpecB, botSpecW, NULL, logger,
-          stopConditions, NULL
+          seed, botSpecB, botSpecW, NULL, NULL, logger,
+          stopConditions, nullptr, nullptr
         );
       }
 
       bool shouldContinue = gameData != NULL;
       if(gameData != NULL) {
         if(sgfOut != NULL) {
-          WriteSgf::writeSgf(*sgfOut,gameData->bName,gameData->wName,gameData->endHist,gameData,false);
+          WriteSgf::writeSgf(*sgfOut,gameData->bName,gameData->wName,gameData->endHist,gameData,false,true);
           (*sgfOut) << endl;
         }
         delete gameData;
@@ -243,11 +243,15 @@ int MainCmds::match(int argc, const char* const* argv) {
     }
     logger.write("Match loop thread terminating");
   };
+  auto runMatchLoopProtected = [&logger,&runMatchLoop](uint64_t threadHash) {
+    Logger::logThreadUncaught("match loop", &logger, [&](){ runMatchLoop(threadHash); });
+  };
+
 
   Rand hashRand;
   vector<std::thread> threads;
   for(int i = 0; i<numGameThreads; i++) {
-    threads.push_back(std::thread(runMatchLoop, hashRand.nextUInt64()));
+    threads.push_back(std::thread(runMatchLoopProtected, hashRand.nextUInt64()));
   }
   for(int i = 0; i<threads.size(); i++)
     threads[i].join();

@@ -610,6 +610,8 @@ struct GTPEngine {
     std::function<void(const Search* search)> callback;
     //lz-analyze
     if(args.lz && !args.kata) {
+      //Avoid capturing anything by reference except [this], since this will potentially be used
+      //asynchronously and called after we return
       callback = [args,pla,this](const Search* search) {
         vector<AnalysisData> buf;
         search->getAnalysisData(buf,args.minMoves,false,analysisPVLen);
@@ -1046,7 +1048,7 @@ struct GTPEngine {
       bot->setParams(params);
     }
 
-    std::function<void(Search* search)> callback = getAnalyzeCallback(pla,args);
+    std::function<void(const Search* search)> callback = getAnalyzeCallback(pla,args);
     bot->setAvoidMoveUntilByLoc(args.avoidMoveUntilByLocBlack,args.avoidMoveUntilByLocWhite);
     if(args.showOwnership)
       bot->setAlwaysIncludeOwnerMap(true);
@@ -1054,7 +1056,7 @@ struct GTPEngine {
       bot->setAlwaysIncludeOwnerMap(false);
 
     double searchFactor = 1e40; //go basically forever
-    bot->analyze(pla, searchFactor, args.secondsPerReport, callback);
+    bot->analyzeAsync(pla, searchFactor, args.secondsPerReport, callback);
   }
 
   double computeLead(Logger& logger) {
@@ -1152,6 +1154,9 @@ struct GTPEngine {
         out << "whiteLead " << Global::strprintf("%.3f",nnOutput->whiteLead) << endl;
         out << "whiteScoreSelfplay " << Global::strprintf("%.3f",nnOutput->whiteScoreMean) << endl;
         out << "whiteScoreSelfplaySq " << Global::strprintf("%.3f",nnOutput->whiteScoreMeanSq) << endl;
+        out << "varTimeLeft " << Global::strprintf("%.3f",nnOutput->varTimeLeft) << endl;
+        out << "shorttermWinlossError " << Global::strprintf("%.3f",nnOutput->shorttermWinlossError) << endl;
+        out << "shorttermScoreError " << Global::strprintf("%.3f",nnOutput->shorttermScoreError) << endl;
 
         out << "policy" << endl;
         for(int y = 0; y<board.y_size; y++) {
@@ -2503,12 +2508,12 @@ int MainCmds::gtp(int argc, const char* const* argv) {
       }
       else if(pieces.size() == 0 || pieces[0] == "-") {
         ostringstream out;
-        WriteSgf::writeSgf(out,"","",engine->bot->getRootHist(),NULL,true);
+        WriteSgf::writeSgf(out,"","",engine->bot->getRootHist(),NULL,true,false);
         response = out.str();
       }
       else {
         ofstream out(pieces[0]);
-        WriteSgf::writeSgf(out,"","",engine->bot->getRootHist(),NULL,true);
+        WriteSgf::writeSgf(out,"","",engine->bot->getRootHist(),NULL,true,false);
         out.close();
         response = "";
       }
